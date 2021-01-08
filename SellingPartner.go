@@ -9,7 +9,21 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"regexp"
+	"time"
 )
+
+type Operations map[string]func(*SellingPartnerParams) error
+
+var AvailableOperations = Operations {
+	"getOrders": func(params *SellingPartnerParams) error {
+		params.Method = "GET"
+		params.APIPath = "/orders/v0/orders"
+		params.RestoreRate = 1 * time.Second
+
+		return nil
+	},
+}
 
 type AccessTokenResponse struct {
 	AccessToken      string `json:"access_token"`
@@ -22,14 +36,16 @@ type SellingPartner struct {
 	Config          *SellingPartnerConfig
 	Credentials     *CredentialsConfig
 	AccessToken     string
-	RoleCredentials RoleCredentials
+	RoleCredentials *RoleCredentials
 }
 
 type SellingPartnerParams struct {
+	Operation string
 	Method string
 	APIPath string
 	Body string
 	Query map[string]interface{}
+	RestoreRate time.Duration
 }
 
 func NewSellingPartner(config *SellingPartnerConfig) (*SellingPartner, error) {
@@ -94,7 +110,7 @@ func (o *SellingPartner) RefreshToken() error {
 
 type RefreshRoleResponse struct {
 	AssumeRoleResponse AssumeRoleResponse
-	ErrorResponse ErrorResponse
+	ErrorResponse      RefreshRoleErrorResponse
 }
 
 type AssumeRoleResponse struct {
@@ -111,13 +127,24 @@ type RoleCredentials struct {
 	SessionToken string
 }
 
-type ErrorResponse struct {
+type RefreshRoleErrorResponse struct {
 	Error RefreshRoleError
 }
 
 type RefreshRoleError struct {
 	Code string
 	Message string
+}
+
+type APIResponse struct {
+	Errors  []APIResponseError      `json:"errors"`
+	Payload *map[string]interface{} `json:"payload"`
+}
+
+type APIResponseError struct {
+	Code    string `json:"code"`
+	Details string `json:"details"`
+	Message string `json:"message"`
 }
 
 func (o *SellingPartner) RefreshRoleCredentials() error {
@@ -178,9 +205,132 @@ func (o *SellingPartner) RefreshRoleCredentials() error {
 	}
 
 	if refreshRoleResponse.AssumeRoleResponse.AssumeRoleResult.Credentials.AccessKeyId != "" {
-		o.RoleCredentials = refreshRoleResponse.AssumeRoleResponse.AssumeRoleResult.Credentials
+		resCredentials := refreshRoleResponse.AssumeRoleResponse.AssumeRoleResult.Credentials
+		o.Config.RoleCredentials = &RoleCredentialsConfig{
+			Id: resCredentials.AccessKeyId,
+			Secret: resCredentials.SecretAccessKey,
+			SecurityToken: resCredentials.SessionToken,
+		}
 		return nil
 	}
 
 	return fmt.Errorf("no role Credentials received. Body: %s", respBody)
+}
+
+func (o *SellingPartner) CallAPI(params SellingPartnerParams) (*string, error) {
+	if params.Operation == "" {
+		return nil, fmt.Errorf("operation is a required parameter")
+	}
+
+	applyParams, present := AvailableOperations[params.Operation]
+	if !present {
+		return nil, fmt.Errorf(`operation "%s" not found`, params.Operation)
+	}
+
+	if o.Config.Options.AutoRequestTokens {
+		if o.AccessToken == "" {
+			if err := o.RefreshToken(); err != nil {
+				return nil, fmt.Errorf("cannot refresh token. Error: %s", err.Error())
+			}
+		}
+
+		if o.RoleCredentials == nil {
+			if err := o.RefreshRoleCredentials(); err != nil {
+				return nil, fmt.Errorf("cannot refresh rrole credentials. Error: %s", err.Error())
+			}
+		}
+	}
+
+	if o.AccessToken == "" || o.Config.RoleCredentials == nil {
+		return nil, fmt.Errorf("no access token or role credentials found")
+	}
+
+	if err := applyParams(&params); err != nil {
+		return nil, fmt.Errorf("cannot apply operation params. Error: " + err.Error())
+	}
+
+	signer := NewSigner(o.Config.Region)
+	println("LIFE", o.Config.RoleCredentials.Secret)
+
+	signedRequest, err := signer.SignAPIRequest(
+							o.AccessToken, *o.Config.RoleCredentials, params)
+
+	if err != nil {
+		return nil, fmt.Errorf("cannot sign api request. Error: %s", err.Error())
+	}
+
+	if o.Config.Options.Debug {
+		requestDump, err := httputil.DumpRequest(signedRequest, true)
+		if err == nil {
+			fmt.Println("==========================================")
+			fmt.Print("CallAPI request dump:\n\n")
+			fmt.Println(string(requestDump))
+		}
+	}
+
+	response, err := http.DefaultTransport.RoundTrip(signedRequest)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if o.Config.Options.Debug {
+		dumpResponse, err := httputil.DumpResponse(response, true)
+		if err == nil {
+			fmt.Println("==========================================")
+			fmt.Print("CallAPI response dump:\n\n")
+			fmt.Println(string(dumpResponse))
+		}
+	}
+
+	if response.StatusCode == 204 && params.Method == "DELETE" {
+		successRes := `{"success": "true"}`
+		return &successRes, nil
+	}
+
+	apiResponse := &APIResponse{}
+	apiResponseBody, _ := ioutil.ReadAll(response.Body)
+	if err = json.Unmarshal(apiResponseBody, apiResponse); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal api response body. Err: %s", err.Error())
+	}
+
+	if len(apiResponse.Errors) == 0 {
+		if apiResponse.Payload != nil {
+			if payload, err := json.Marshal(apiResponse.Payload); err == nil {
+				payloadStr := string(payload)
+				return &payloadStr, nil
+			} else {
+				return nil, fmt.Errorf("cannot convert payload to string")
+			}
+		}
+		apiResponseBodyStr := string(apiResponseBody)
+		return &apiResponseBodyStr, nil
+	}
+
+	theError := apiResponse.Errors[0]
+
+	if response.StatusCode == 403 && theError.Code == "Unauthorized" {
+		if o.Config.Options.AutoRequestTokens {
+			if doesMatch, _ := regexp.MatchString("access token.*expired", theError.Details); doesMatch {
+				if err := o.RefreshToken(); err == nil {
+					return o.CallAPI(params)
+				} else {
+					return nil, err
+				}
+			} else if doesMatch, _ := regexp.MatchString("security token.*expired", theError.Message); doesMatch {
+				if err := o.RefreshRoleCredentials(); err == nil {
+					return o.CallAPI(params)
+				} else {
+					return nil, err
+				}
+			}
+		}
+	} else if response.StatusCode == 429 && theError.Code == "QuotaExceeded" && o.Config.Options.AutoRequestThrottled {
+		time.Sleep(params.RestoreRate)
+		return o.CallAPI(params)
+	}
+
+	errJson, _ := json.Marshal(theError)
+	errStr := string(errJson)
+	return &errStr, fmt.Errorf("unknown error")
 }
