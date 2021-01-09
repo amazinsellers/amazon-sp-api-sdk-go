@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/amazinsellers/amazon-sp-api-sdk-go/resources"
 	"net/http"
 	"regexp"
 	"sort"
@@ -139,7 +140,7 @@ func (o Signer) ConstructCanonicalRequestForRoleCredentials(encodedQueryString s
 }
 
 func (o Signer) ConstructCanonicalRequestForAPI(
-		accessToken string, params SellingPartnerParams,
+		accessToken string, params resources.SellingPartnerParams,
 		encodedQueryString string) string {
 	h := sha256.New()
 	h.Write([]byte(params.Body))
@@ -199,7 +200,7 @@ func (o Signer) ConstructSignature(region string, actionType string, stringToSig
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (o Signer) ConstructURL(params SellingPartnerParams, encodedQueryString string) string {
+func (o Signer) ConstructURL(params resources.SellingPartnerParams, encodedQueryString string) string {
 	url := fmt.Sprintf("https://%s%s", o.APIEndpoint, params.APIPath)
 
 	if encodedQueryString != "" {
@@ -209,7 +210,8 @@ func (o Signer) ConstructURL(params SellingPartnerParams, encodedQueryString str
 	return url
 }
 
-func (o *Signer) SignAPIRequest(accessToken string, config RoleCredentialsConfig, params SellingPartnerParams) (*http.Request, error) {
+func (o *Signer) SignAPIRequest(accessToken string,
+			config RoleCredentialsConfig, params resources.SellingPartnerParams) (*http.Request, error) {
 	params.Query = o.SortQuery(params.Query)
 	o.CreateUTCISODate()
 

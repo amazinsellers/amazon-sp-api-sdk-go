@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/amazinsellers/amazon-sp-api-sdk-go/resources"
 	xj "github.com/basgys/goxml2json"
 	"io/ioutil"
 	"net/http"
@@ -12,18 +13,6 @@ import (
 	"regexp"
 	"time"
 )
-
-type Operations map[string]func(*SellingPartnerParams) error
-
-var AvailableOperations = Operations {
-	"getOrders": func(params *SellingPartnerParams) error {
-		params.Method = "GET"
-		params.APIPath = "/orders/v0/orders"
-		params.RestoreRate = 1 * time.Second
-
-		return nil
-	},
-}
 
 type AccessTokenResponse struct {
 	AccessToken      string `json:"access_token"`
@@ -37,15 +26,6 @@ type SellingPartner struct {
 	Credentials     *CredentialsConfig
 	AccessToken     string
 	RoleCredentials *RoleCredentials
-}
-
-type SellingPartnerParams struct {
-	Operation string
-	Method string
-	APIPath string
-	Body string
-	Query map[string]interface{}
-	RestoreRate time.Duration
 }
 
 func NewSellingPartner(config *SellingPartnerConfig) (*SellingPartner, error) {
@@ -217,7 +197,7 @@ func (o *SellingPartner) RefreshRoleCredentials() error {
 	return fmt.Errorf("no role Credentials received. Body: %s", respBody)
 }
 
-func (o *SellingPartner) CallAPI(params SellingPartnerParams) (*string, error) {
+func (o *SellingPartner) CallAPI(params resources.SellingPartnerParams) (*string, error) {
 	if params.Operation == "" {
 		return nil, fmt.Errorf("operation is a required parameter")
 	}
