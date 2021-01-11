@@ -230,7 +230,6 @@ func (o *SellingPartner) CallAPI(params resources.SellingPartnerParams) (*string
 	}
 
 	signer := NewSigner(o.Config.Region)
-	println("LIFE", o.Config.RoleCredentials.Secret)
 
 	signedRequest, err := signer.SignAPIRequest(
 							o.AccessToken, *o.Config.RoleCredentials, params)
@@ -312,5 +311,5 @@ func (o *SellingPartner) CallAPI(params resources.SellingPartnerParams) (*string
 
 	errJson, _ := json.Marshal(theError)
 	errStr := string(errJson)
-	return &errStr, fmt.Errorf("unknown error")
+	return &errStr, fmt.Errorf("unknown error: %s", errStr)
 }

@@ -9,4 +9,5 @@ type SellingPartnerParams struct {
 	Body string
 	Query map[string]interface{}
 	RestoreRate time.Duration
+	PathParams map[string]string
 }

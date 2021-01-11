@@ -107,6 +107,7 @@ func (o Signer) ConstructEncodedQueryString(query map[string]interface{}) string
 	}
 
 	queryString, _ := qs.Marshal(query)
+	queryString = strings.Replace(queryString, "+", "%20", -1)
 
 	encodedQuery := map[string]string{}
 	queryParams := strings.Split(queryString, "&")
