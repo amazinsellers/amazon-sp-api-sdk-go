@@ -5,14 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/amazinsellers/amazon-sp-api-sdk-go/qs"
 	"github.com/amazinsellers/amazon-sp-api-sdk-go/resources"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/derekstavis/go-qs"
 )
 
 type Signer struct {
@@ -50,9 +50,9 @@ func (o *Signer) CreateUTCISODate() {
 	}
 }
 
-func (o Signer) SortQuery(query map[string]interface{}) map[string]interface{} {
+func (o Signer) SortQuery(query url.Values) url.Values {
 	if len(query) == 0 {
-		return map[string]interface{}{}
+		return url.Values{}
 	}
 
 	mk := make([]string, len(query))
@@ -63,7 +63,7 @@ func (o Signer) SortQuery(query map[string]interface{}) map[string]interface{} {
 	}
 	sort.Strings(mk)
 
-	sortedQuery := map[string]interface{}{}
+	sortedQuery := url.Values{}
 
 	for _, value := range mk {
 		sortedQuery[value] = query[value]
@@ -101,13 +101,21 @@ func (o Signer) SortQueryString(query map[string]string) string {
 	return ""
 }
 
-func (o Signer) ConstructEncodedQueryString(query map[string]interface{}) string {
+func (o Signer) ConstructEncodedQueryString(query url.Values) string {
 	if len(query) == 0 {
 		return ""
 	}
 
-	queryString, _ := qs.Marshal(query)
+	queryInherent := make(map[string]interface{}, len(query))
+
+	for aKey, aValue := range query {
+		queryInherent[aKey] = aValue
+	}
+
+	queryString, _ := qs.Marshal(queryInherent)
 	queryString = strings.Replace(queryString, "+", "%20", -1)
+
+	println(queryString)
 
 	encodedQuery := map[string]string{}
 	queryParams := strings.Split(queryString, "&")
@@ -245,12 +253,12 @@ func (o *Signer) SignAPIRequest(accessToken string,
 }
 
 func (o *Signer) SignRoleCredentialsRequest(config AWSUserConfig) (*http.Request, error) {
-	query := map[string]interface{} {
-		"Action": "AssumeRole",
-		"DurationSeconds": "3600",
-		"RoleArn": config.Role,
-		"RoleSessionName": "SPAPISession",
-		"Version": "2011-06-15",
+	query := url.Values {
+		"Action": {"AssumeRole"},
+		"DurationSeconds": {"3600"},
+		"RoleArn": {config.Role},
+		"RoleSessionName": {"SPAPISession"},
+		"Version": {"2011-06-15"},
     }
 
 	o.CreateUTCISODate()
