@@ -27,3 +27,58 @@ Before you can use the client you need to add your app client and aws user crede
 * `AWS_SELLING_PARTNER_SECRET_ACCESS_KEY` or `AWS_SECRET_ACCESS_KEY`=<YOUR_AWS_USER_SECRET> ([see SP Developer Guide "Create an IAM user"](https://github.com/amzn/selling-partner-api-docs/blob/main/guides/developer-guide/SellingPartnerApiDeveloperGuide.md#step-2-create-an-iam-user))
 * `AWS_SELLING_PARTNER_ROLE`=<YOUR_AWS_SELLING_PARTNER_API_ROLE> ([see SP Developer Guide "Create an IAM role"](https://github.com/amzn/selling-partner-api-docs/blob/main/guides/developer-guide/SellingPartnerApiDeveloperGuide.md#step-4-create-an-iam-role))
 
+### Usage
+
+A sample to get a catalog item:
+```go
+package main 
+
+import (
+	"github.com/amazinsellers/amazon-sp-api-sdk-go"
+	"github.com/amazinsellers/amazon-sp-api-sdk-go/resources"
+)
+
+func main() {
+	spConfig := amazonspapi.NewSellingPartnerConfig()
+	spConfig.Options.Debug = true
+	spConfig.RefreshToken = "Atzr|XXXXXXXXXXXXXXXXXXXXXXXXXXXX..."
+	spConfig.Region = "eu"
+
+	sp, err := amazonspapi.NewSellingPartner(spConfig)
+
+	if err != nil {
+		println(err.Error())
+		return
+	}
+
+	params := resources.SellingPartnerParams{
+		Operation: "getCatalogItem",
+		Query: map[string]interface{}{
+			"MarketplaceId": "A1F83G8C2ARO7P",
+		},
+		PathParams: map[string]string{
+			"asin": "B08SB9WBG8",
+		},
+	}
+
+	resp, err := sp.CallAPI(params)
+	if err != nil {
+		println(err.Error())
+		return
+	}
+
+	println(*resp)
+}
+```
+
+## Call the API
+
+The **.CallAPI()** function takes an object as input:
+* Operation: Required, the operation you want to request [see SP API References](https://github.com/amzn/selling-partner-api-docs/tree/main/references)
+* PathParams: The input paramaters added to the path of the operation
+* Query: The input parameters added to the query string of the operation
+* Body: The input parameters added to the body of the operation
+
+## TODO
+1. Download reports
+2. Upload files
