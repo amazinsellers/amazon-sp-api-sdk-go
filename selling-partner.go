@@ -116,9 +116,53 @@ type RefreshRoleError struct {
 	Message string
 }
 
-type APIResponse struct {
+type APIResponse interface {
+	GetErrors() []APIResponseError
+	GetPayloadStr() (*string, error)
+}
+
+type APIResponseMapPayload struct {
 	Errors  []APIResponseError      `json:"errors"`
 	Payload *map[string]interface{} `json:"payload"`
+}
+
+func (o APIResponseMapPayload) GetErrors() []APIResponseError {
+	return o.Errors
+}
+
+func (o APIResponseMapPayload) GetPayloadStr() (*string, error) {
+	if o.Payload == nil {
+		return nil, nil
+	}
+
+	if payload, err := json.Marshal(o.Payload); err == nil {
+		payloadStr := string(payload)
+		return &payloadStr, nil
+	}
+
+	return nil, fmt.Errorf("cannot convert payload to string")
+}
+
+type APIResponseArrayPayload struct {
+	Errors  []APIResponseError `json:"errors"`
+	Payload []*map[string]interface{} `json:"payload"`
+}
+
+func (o APIResponseArrayPayload) GetErrors() []APIResponseError {
+	return o.Errors
+}
+
+func (o APIResponseArrayPayload) GetPayloadStr() (*string, error) {
+	if o.Payload == nil {
+		return nil, nil
+	}
+
+	if payload, err := json.Marshal(o.Payload); err == nil {
+		payloadStr := string(payload)
+		return &payloadStr, nil
+	}
+
+	return nil, fmt.Errorf("cannot convert payload to string")
 }
 
 type APIResponseError struct {
@@ -267,26 +311,38 @@ func (o *SellingPartner) CallAPI(params resources.SellingPartnerParams) (*string
 		return &successRes, nil
 	}
 
-	apiResponse := &APIResponse{}
 	apiResponseBody, _ := ioutil.ReadAll(response.Body)
-	if err = json.Unmarshal(apiResponseBody, apiResponse); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal api response body. Err: %s", err.Error())
+
+	var apiResponse APIResponse
+	apiResponseMap := &APIResponseMapPayload{}
+	apiResponseArray := &APIResponseArrayPayload{}
+
+	if err = json.Unmarshal(apiResponseBody, apiResponseMap); err != nil {
+		if err = json.Unmarshal(apiResponseBody, apiResponseArray); err != nil {
+			return nil, fmt.Errorf("cannot unmarshal api response body. Err: %s", err.Error())
+		} else {
+			apiResponse = apiResponseArray
+		}
+	} else {
+		apiResponse = apiResponseMap
 	}
 
-	if len(apiResponse.Errors) == 0 {
-		if apiResponse.Payload != nil {
-			if payload, err := json.Marshal(apiResponse.Payload); err == nil {
-				payloadStr := string(payload)
-				return &payloadStr, nil
-			} else {
-				return nil, fmt.Errorf("cannot convert payload to string")
-			}
+	if len(apiResponse.GetErrors()) == 0 {
+		payloadStr, err := apiResponse.GetPayloadStr()
+
+		if err != nil {
+			return nil, err
 		}
+
+		if payloadStr != nil {
+			return payloadStr, nil
+		}
+
 		apiResponseBodyStr := string(apiResponseBody)
 		return &apiResponseBodyStr, nil
 	}
 
-	theError := apiResponse.Errors[0]
+	theError := apiResponse.GetErrors()[0]
 
 	if response.StatusCode == 403 && theError.Code == "Unauthorized" {
 		if o.Config.Options.AutoRequestTokens {
