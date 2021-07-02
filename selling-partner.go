@@ -313,6 +313,8 @@ func (o *SellingPartner) CallAPI(params resources.SellingPartnerParams) (*string
 
 	apiResponseBody, _ := ioutil.ReadAll(response.Body)
 
+	apiResponseBody = bytes.ReplaceAll(apiResponseBody, []byte(": IOSS"), []byte(`: "IOSS"`))
+
 	var apiResponse APIResponse
 	apiResponseMap := &APIResponseMapPayload{}
 	apiResponseArray := &APIResponseArrayPayload{}
