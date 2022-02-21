@@ -42,7 +42,7 @@ func NewSigner(region string) *Signer {
 func (o *Signer) CreateUTCISODate() {
 	var re = regexp.MustCompile(`[:\-]|\.\d{3}`)
 
-	isoDate := re.ReplaceAllString(time.Now().Format(time.RFC3339), "")
+	isoDate := re.ReplaceAllString(time.Now().UTC().Format(time.RFC3339), "")
 
 	o.ISODate = ISODate{
 		Short: isoDate[:8],
