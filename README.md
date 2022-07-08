@@ -6,6 +6,8 @@ Credits due to the contributors of that repository: [https://github.com/amz-tool
 The client handles calls to the Amazon Selling Partner API. It wraps up all the necessary stuff 
 such as requesting access token, security token and signing requests with AWS4 signature.
 
+(Looking for Amazon Ads API SDK? Here it is: [https://github.com/amazinsellers/amazon-ads-api-sdk-go](https://github.com/amazinsellers/amazon-ads-api-sdk-go))
+
 ## Prerequisites
 Make sure that you followed the [Selling Partner API Developer Guide](https://github.com/amzn/selling-partner-api-docs/blob/main/guides/developer-guide/SellingPartnerApiDeveloperGuide.md)
 and have successfully completed the steps [Registering as a developer](https://github.com/amzn/selling-partner-api-docs/blob/main/guides/developer-guide/SellingPartnerApiDeveloperGuide.md#registering-as-a-developer),
