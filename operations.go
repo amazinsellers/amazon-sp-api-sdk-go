@@ -121,4 +121,5 @@ var AvailableOperations = Operations{
 	"getSolicitationActionsForOrder":                   resources.GetSolicitationActionsForOrder,
 	"createProductReviewAndSellerFeedbackSolicitation": resources.CreateProductReviewAndSellerFeedbackSolicitation,
 	"createUploadDestinationForResource":               resources.CreateUploadDestinationForResource,
+	"createRestrictedDataToken":                        resources.CreateRestrictedDataToken,
 }
